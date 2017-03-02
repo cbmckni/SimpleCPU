@@ -1,0 +1,21 @@
+/***********************************************
+Name: Cole McKnight, Robert Morrow
+File: sim.c
+Description: simulates a basic CPU.
+Date: 3/7/17
+***********************************************/
+#include <stdio.h> 
+
+int main() 
+{
+    int x = 0;
+    int word;
+    while(scanf("%x", &word) != -1)
+    {
+        x++; 
+        printf("%x ", word);
+    
+    }
+    printf("\nInstructions  %x", x);
+    return 0;
+}
