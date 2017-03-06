@@ -5,24 +5,6 @@ Description: simulates a basic CPU.
 Date: 3/7/17
 ***********************************************/
  
-#define ACC_IN 0
-#define ACC_OUT 1
-#define ALU_ADD 2
-#define ALU_SUB 3
-#define IR_IN 4
-#define IR_OUT 5
-#define MAR_IN 6
-#define MDR_IN 7
-#define MDR_OUT 8
-#define PC_IN 9
-#define PC_OUT 10
-#define PC_INCR 11
-#define READ 12
-#define TMP_OUT 13
-#define WRITE 14
-#define BRTABLE 15
-#define NEXT 16
-#define OR_ADDR 17
 #include <stdio.h>
 
 /* base inst set */
@@ -36,30 +18,30 @@ Date: 3/7/17
  // cs[ 3][MDR_OUT] = 1; cs[ 3][  IR_IN] = 1; cs[ 3][NEXT] =  4;
  // cs[ 4][BRTABLE] = 1;                      cs[ 4][NEXT] =  0;
 struct CSIR{
-  unsigned int ACC_IN:1; //bit  0 == ACC_in
-  unsigned int ACC_OUT:1; //bit  1 == ACC_out
-  unsigned int ALU_ADD:1; //bit  2 == alu_add
-  unsigned int ALU_SUB:1; //bit  3 == alu_sub
-  unsigned int IR_IN:1; //bit  4 == IR_in
-  unsigned int IR_OUT:1; //bit  5 == IR_out
-  unsigned int MAR_IN:1; //bit  6 == MAR_in
-  unsigned int MDR_IN:1; //bit  7 == MDR_in
-  unsigned int MDR_OUT:1; //bit  8 == MDR_out
-  unsigned int PC_IN:1; //bit  9 == PC_in
-  unsigned int PC_OUT:1; //bit 10 == PC_out
-  unsigned int PC_INCR:1; //bit 11 == pc_incr
-  unsigned int READ:1; //bit 12 == read
-  unsigned int TMP_OUT:1; //bit 13 == TMP_out
-  unsigned int WRITE:1; //bit 14 == write
-  unsigned int BRTABLE:1; //bit 15 == br_table
+  unsigned int ACC_IN:1=0; //bit  0 == ACC_in
+  unsigned int ACC_OUT:1=0; //bit  1 == ACC_out
+  unsigned int ALU_ADD:1=0; //bit  2 == alu_add
+  unsigned int ALU_SUB:1=0; //bit  3 == alu_sub
+  unsigned int IR_IN:1=0; //bit  4 == IR_in
+  unsigned int IR_OUT:1=0; //bit  5 == IR_out
+  unsigned int MAR_IN:1=0; //bit  6 == MAR_in
+  unsigned int MDR_IN:1=0; //bit  7 == MDR_in
+  unsigned int MDR_OUT:1=0; //bit  8 == MDR_out
+  unsigned int PC_IN:1=0; //bit  9 == PC_in
+  unsigned int PC_OUT:1=0; //bit 10 == PC_out
+  unsigned int PC_INCR:1=0; //bit 11 == pc_incr
+  unsigned int READ:1=0; //bit 12 == read
+  unsigned int TMP_OUT:1=0; //bit 13 == TMP_out
+  unsigned int WRITE:1=0; //bit 14 == write
+  unsigned int BRTABLE:1=0; //bit 15 == br_table
 };
 
 struct CSAR {
-  unsigned int CSAR:5; //bits 16-20 == 5-bit next control store address field
+  unsigned int CSAR:5=0; //bits 16-20 == 5-bit next control store address field
 ;
 
 struct OR{
-  unsigned int OR_ADDR:1; //bit 21 == or_addr
+  unsigned int OR_ADDR:1=0; //bit 21 == or_addr
 };
 
 struct ControlStoreEntry{
@@ -69,15 +51,15 @@ struct ControlStoreEntry{
 };
 
 struct ControlStore{
-  struct ControlStoreEntry instructionFetch[5];
-  struct ControlStoreEntry load[3]:
-  struct ControlStoreEntry add[4];
-  struct ControlStoreEntry store[3];
-  struct ControlStoreEntry brz[1];
-  struct ControlStoreEntry sub[4];
-  struct ControlStoreEntry jsub[];
-  struct ControlStoreEntry jmpi[];
-  struct ControlStoreEntry halt[];
+  struct ControlStoreEntry instructionFetch[5]; //5 time cycles for IF
+  struct ControlStoreEntry load[3]: //3 time cycles for load instruction
+  struct ControlStoreEntry add[4]; //4 time cycles for add instruction
+  struct ControlStoreEntry store[3]; //3 time cycles for store instructions
+  struct ControlStoreEntry brz[1]; //1 time cycle for branch zero
+  struct ControlStoreEntry sub[4]; //4 time cycles for sub instruction
+  struct ControlStoreEntry jsub[4]; //4 time cycles for jsub instruction
+  struct ControlStoreEntry jmpi[4]; //4 time cycles for jmpi instruction
+  struct ControlStoreEntry halt[1]; //1 time cycle for halt
 };
 
 int main() 
