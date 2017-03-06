@@ -1,0 +1,59 @@
+Control Store Instruction Register
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Instruction Fetch:
+  addr   control signals    next addr   or  control signal names   
+   0  | 0000001000100000 | 00010 (=2) | 0 | MAR_in  PC_out    
+   1  | 0000010001000000 | 00000 (=0) | 0 | PCin    IR_out       
+   2  | 0000000000011000 | 00011 (=3) | 0 | pc_incr read       
+   3  | 0000100010000000 | 00100 (=4) | 0 | IR_in   MDR_out      
+   4  | 0000000000000001 | 00000 (=0) | 0 | br_table
+
+Load: acc <- mem[addr]
+   5  | 0000011000000000 | 00110 (=6) | 0 | MAR_in  IR_out    
+   6  | 0000000000001000 | 00111 (=7) | 0 | read               
+   7  | 1000000010000000 | 00000 (=0) | 0 | ACC_in  MDR_out   
+
+Add: acc <- acc + mem[addr]
+   8  | 0000011000000000 | 01001 (=9) | 0 | MAR_in  IR_out    
+   9  | 0000000000001000 | 01010 (=a) | 0 | read               
+   a  | 0110000000000000 | 01011 (=b) | 0 | ACC_out alu_add    
+   b  | 1000000000000100 | 00000 (=0) | 0 | ACC_in  TMP_out    
+
+Store: mem[addr] <- acc
+   c  | 0000011000000000 | 01101 (=d) | 0 | MAR_in  IR_out        
+   d  | 0100000100000000 | 01110 (=e) | 0 | MDR_in  ACC_out
+   e  | 0000000000000010 | 00000 (=0) | 0 | write
+
+Branch: if( acc==0 ) pc <- addr
+   f  | 0000000000000000 | 00000 (=0) | 1 | or_addr (low bit of next addr is
+                                          |      or'ed with ACC==0 condition)
+Sub: acc <- acc - mem[addr]
+  10  | 0000011000000000 | 10001 (=11) | 0 | MAR_in  IR_out     
+  11  | 0000000000001000 | 10010 (=12) | 0 | read               
+  12  | 0101000000000000 | 10011 (=13) | 0 | ACC_out alu_sub    
+  13  | 1000000000000100 | 00000 (=0 ) | 0 | ACC_in  TMP_out    
+
+Jump Subroutine: mem[addr] <- updated pc; pc <- addr + 1
+  14  | 0000011000000000 | 10101 (=15) | 0 | MAR_in  IR_out     
+  15  | 0000000000010000 | 10110 (=16) | 0 | pc_incr                
+  16  | 0000001001000000 | 10111 (=17) | 0 | MDR_in  PC_out    
+  17  | 0000000000000010 | 00000 (=0 ) | 0 | write    
+Jump Instruction: pc <- mem[addr]
+  18  | 0000011000000000 | 10001 (=19) | 0 | MAR_in IR_out
+  19  | 0000000000001000 | 00111 (=1a) | 0 | read             
+  1a  | 0000000110000000 | 10001 (=1b) | 0 | MDR_out PC_in
+  1b  | 0000000000000010 | 00000 (=0)  | 0 | write
+Halt:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Decoding Table:
+opc  addr
+   +-----+
+000|00101| Load = Hex(5)  
+001|01000| Add = Hex(8) 
+010|01100| Store = Hex(c) 
+011|01111| Branch = Hex(f)
+100|10000| sub = Hex(10)
+101|10100| Jsub = Hex(14)
+110|11000| Jmpi = Hex(19)
+111|11100| Halt = Hex(1c)
