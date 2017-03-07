@@ -5,80 +5,7 @@ Description: simulates a basic CPU.
 Date: 3/7/17
 ***********************************************/
  
-#include <stdio.h>
-
-/* base inst set */
-
-  /* ifetch entry */
- // cs[ 0][ PC_OUT] = 1; cs[ 0][ MAR_IN] = 1; cs[ 0][NEXT] =  2;
-    /* special taken branch entry */
- // cs[ 1][ IR_OUT] = 1; cs[ 1][  PC_IN] = 1; cs[ 1][NEXT] =  0;
-    /* rest of ifetch */
- // cs[ 2][PC_INCR] = 1; cs[ 2][   READ] = 1; cs[ 2][NEXT] =  3;
- // cs[ 3][MDR_OUT] = 1; cs[ 3][  IR_IN] = 1; cs[ 3][NEXT] =  4;
- // cs[ 4][BRTABLE] = 1;                      cs[ 4][NEXT] =  0;
-struct CSIR { 
-  unsigned int ACC_IN:1; //bit  0 == ACC_in
-  unsigned int ACC_OUT:1; //bit  1 == ACC_out
-  unsigned int ALU_ADD:1; //bit  2 == alu_add
-  unsigned int ALU_SUB:1; //bit  3 == alu_sub
-  unsigned int IR_IN:1; //bit  4 == IR_in
-  unsigned int IR_OUT:1; //bit  5 == IR_out
-  unsigned int MAR_IN:1; //bit  6 == MAR_in
-  unsigned int MDR_IN:1; //bit  7 == MDR_in
-  unsigned int MDR_OUT:1; //bit  8 == MDR_out
-  unsigned int PC_IN:1; //bit  9 == PC_in
-  unsigned int PC_OUT:1; //bit 10 == PC_out
-  unsigned int PC_INCR:1; //bit 11 == pc_incr
-  unsigned int READ:1; //bit 12 == read
-  unsigned int TMP_OUT:1; //bit 13 == TMP_out
-  unsigned int WRITE:1; //bit 14 == write
-  unsigned int BRTABLE:1; //bit 15 == br_table
-};
-
-struct CSAR {
-  unsigned int csar:5; //bits 16-20 == 5-bit next control store address field
-};
-
-struct OR_ADDR{
-  unsigned int or_addr:1; //bit 21 == or_addr
-};
-
-struct ControlStoreEntry{
-  struct CSIR controlSignals; //first 16 bits of the control store
-  struct CSAR nextAddr; //5 bits for the next address
-  struct OR_ADDR orAddr; //1 bit for the or_addr
-};
-
-struct ControlStore{
-  struct ControlStoreEntry instructionFetch[5]; //5 time cycles for IF
-  struct ControlStoreEntry load[3]; //3 time cycles for load instruction
-  struct ControlStoreEntry add[4]; //4 time cycles for add instruction
-  struct ControlStoreEntry store[3]; //3 time cycles for store instructions
-  struct ControlStoreEntry brz[1]; //1 time cycle for branch zero
-  struct ControlStoreEntry sub[4]; //4 time cycles for sub instruction
-  struct ControlStoreEntry jsub[4]; //4 time cycles for jsub instruction
-  struct ControlStoreEntry jmpi[4]; //4 time cycles for jmpi instruction
-  struct ControlStoreEntry halt[1]; //1 time cycle for halt
-};
-
-struct Registers {
-	unsigned int PC:9;      //Program Counter 9 bits
-    unsigned int MAR:9;     //Memory Address Register 9 bits
-    unsigned int IR:12;      //Instruction Register 12 bits
-    unsigned int MDR:12;     //Memory Data Register 12 bits
-    unsigned int ACC:12;     //Accumulator 12 bits
-    unsigned int TMP:12;     //Temp 12 bits
-};
-
-struct MemoryWord {
-	unsigned int opcode:3; //3 bits for opcode, 9 bits for address field
-	unsigned int addr:9;
-};
-
-struct MainMemory {
-	struct MemoryWord mainMem[512]; //max size of 512
-};
+#include "sim.h"
 
 int main() 
 {
@@ -86,36 +13,17 @@ int main()
     //main memory
     struct MainMemory mem; //Main Memory 512 x 12-bit memory
     //registers
-    struct Registers mRegisters;
-    struct CSIR mCSIR;       //Control Store instruction register 22-bits
-    struct CSAR mCSAR;    //Control Store address register 5-bits
-    struct ControlStore mControlStore; //Control Store 32 x 22-bit           
+    struct Registers mRegisters= Registers_default;
+    struct ControlStoreEntry currentCS; //CSIR, CSAR, and Or_addr
+    struct ControlStore mControlStore; //Control Store 32 x 22-bit 
+    struct CSAR mCSAR;          
     //data bus?
     //unsigned int BUS = 0;
+    //initialize Control Store values
+    mControlStore= fillControlStore();
 
-    
     unsigned int word, opcode, addr;
     int counter=0;
-    // if(scanf("%x", &word) != -1) 
-    // {
-    //   counter++;
-    //     while(word != -1)
-    //     {
-    //         counter++;                          //incr pc
-    //         mem.mainMem[counter].opcode= word >> 9; 
-    //         opcode = word >> 9;            //calc opcode
-
-    //         unsigned int mask = 0x1FF;     
-    //         mem.mainMem[counter].addr=word & mask;
-    //         addr = word & mask;            //calc addr
-
-    //         printf("\n %x = %d -> %d", word, opcode, addr); 
-
-    //         scanf("%x", &word);            //read next inst
-    //     }
-    //     printf("\n HALT\nInstructions:  %d \n", counter);
-    // }
-	
     //scan the input into the main memory
     while(scanf("%x", &word) != EOF && word != -1){   
         opcode = word >> 9;            //calc opcode
@@ -140,10 +48,66 @@ int main()
     	if(i==9)
     		printf("\n");
     }
-
+    printf("\n");
+     
     //begin processing the instructions in mainmem
+    int cycle=1;
     for(i=0; i< counter; i++){
-    	
+    	currentCS=indexCS(mControlStore, mCSAR.csar);
+    	mCSAR=currentCS.nextAddr;
+    	printf("%d:\t", cycle); printRegisters(mRegisters); printf("%x\t", mCSAR.csar); printCSIR(currentCS);
+
+    	if(currentCS.controlSignals.ACC_IN==1){
+    		if(currentCS.controlSignals.TMP_OUT==1){
+    			mRegisters.ACC=mRegisters.TMP;
+    		}
+    		if(currentCS.controlSignals.MDR_OUT==1){
+    			mRegisters.ACC=mRegisters.MDR;
+    		}
+    	}
+		if(currentCS.controlSignals.IR_IN==1){
+			if(currentCS.controlSignals.TMP_OUT==1){
+    			mRegisters.IR=mRegisters.TMP;
+    		}
+    		if(currentCS.controlSignals.MDR_OUT==1){
+    			mRegisters.IR=mRegisters.MDR;
+    		}
+		}
+		if(currentCS.controlSignals.PC_INCR==1) {
+			mRegisters.PC++;
+		}
+		if(currentCS.controlSignals.READ==1){
+			mRegisters.MDR=mem.mainMem[i].addr;
+		}
+		if(currentCS.controlSignals.WRITE==1){
+			mem.mainMem[i].addr=mRegisters.MDR;
+		}
+		if(currentCS.controlSignals.MDR_IN==1) {
+			if(currentCS.controlSignals.ACC_OUT==1){
+    			mRegisters.MDR=mRegisters.ACC;
+    		}
+    		if(currentCS.controlSignals.PC_OUT==1){
+    			mRegisters.MDR=mRegisters.PC;
+    		}
+		}
+		if(currentCS.controlSignals.MAR_IN==1) {
+			if(currentCS.controlSignals.IR_OUT==1){
+    			mRegisters.MAR=mRegisters.IR;
+    		}
+    		if(currentCS.controlSignals.PC_OUT==1){
+    			mRegisters.MAR=mRegisters.PC;
+    		}
+
+		}
+		if(currentCS.controlSignals.PC_IN==1) {
+			if(currentCS.controlSignals.IR_OUT==1){
+    			mRegisters.PC=mRegisters.IR;
+    		}
+    		if(currentCS.controlSignals.MDR_OUT==1){
+    			mRegisters.PC=mRegisters.MDR;
+    		}
+		}
+
     }
     /*
     while(CSIR != -1)
@@ -172,37 +136,225 @@ int main()
     */
     return 0;
 }
-/*
-  bit  0 == ACC_in
-  bit  1 == ACC_out
-  bit  2 == alu_add
-  bit  3 == alu_sub
-  bit  4 == IR_in
-  bit  5 == IR_out
-  bit  6 == MAR_in
-  bit  7 == MDR_in
-  bit  8 == MDR_out
-  bit  9 == PC_in
-  bit 10 == PC_out
-  bit 11 == pc_incr
-  bit 12 == read
-  bit 13 == TMP_out
-  bit 14 == write
-  bit 15 == br_table
-  bits 16-20 == 5-bit next control store address field
-  bit 21 == or_addr
-*/
-/*psuedocode
-while(!halt)
-{
-    CSIR = CS[CSAR];
-    
-    if(CSIR[PC_INCR])
-        PC++;
-    if(CSIR[MAR_IN])
-        MAR = BUS;
-    if(CSIR[PC_OUT])
-        BUS = PC;
+
+struct ControlStore fillControlStore(){
+	struct ControlStore mControlStore;
+	//ifetch 
+	mControlStore.instructionFetch[0].controlSignals=CSIR_default;
+    mControlStore.instructionFetch[0].controlSignals.MAR_IN=1; mControlStore.instructionFetch[0].controlSignals.PC_OUT=1; 
+    mControlStore.instructionFetch[0].nextAddr.csar=2; 
+    mControlStore.instructionFetch[1].controlSignals=CSIR_default;
+    mControlStore.instructionFetch[1].controlSignals.PC_IN=1; mControlStore.instructionFetch[1].controlSignals.IR_OUT=1; 
+    mControlStore.instructionFetch[1].nextAddr.csar=0; 
+    mControlStore.instructionFetch[2].controlSignals=CSIR_default;
+    mControlStore.instructionFetch[2].controlSignals.PC_INCR=1; mControlStore.instructionFetch[2].controlSignals.READ=1; 
+    mControlStore.instructionFetch[2].nextAddr.csar=3; 
+    mControlStore.instructionFetch[3].controlSignals=CSIR_default;
+    mControlStore.instructionFetch[3].controlSignals.IR_IN=1; mControlStore.instructionFetch[3].controlSignals.MDR_OUT=1; 
+    mControlStore.instructionFetch[3].nextAddr.csar=4; 
+    mControlStore.instructionFetch[4].controlSignals=CSIR_default;
+    mControlStore.instructionFetch[4].controlSignals.BRTABLE=1; 
+    mControlStore.instructionFetch[4].nextAddr.csar=0; 
+    //load
+    mControlStore.load[0].controlSignals=CSIR_default;
+    mControlStore.load[0].controlSignals.MAR_IN=1; mControlStore.load[0].controlSignals.IR_OUT=1;
+    mControlStore.load[0].nextAddr.csar=6; 
+    mControlStore.load[1].controlSignals=CSIR_default;
+    mControlStore.load[1].controlSignals.READ=1;
+    mControlStore.load[1].nextAddr.csar=7;
+    mControlStore.load[2].controlSignals=CSIR_default;
+    mControlStore.load[2].controlSignals.ACC_IN=1; mControlStore.load[2].controlSignals.MDR_OUT=1;
+    mControlStore.load[2].nextAddr.csar=0;
+    //add
+    mControlStore.add[0].controlSignals=CSIR_default;
+    mControlStore.add[0].controlSignals.MAR_IN=1; mControlStore.add[0].controlSignals.IR_OUT=1;
+    mControlStore.add[0].nextAddr.csar=9;
+    mControlStore.add[1].controlSignals=CSIR_default;
+    mControlStore.add[1].controlSignals.READ=1; 
+    mControlStore.add[1].nextAddr.csar=10;
+    mControlStore.add[2].controlSignals=CSIR_default;
+    mControlStore.add[2].controlSignals.ACC_OUT=1; mControlStore.add[2].controlSignals.ALU_ADD=1;
+    mControlStore.add[2].nextAddr.csar=11;
+    mControlStore.add[3].controlSignals=CSIR_default;
+    mControlStore.add[3].controlSignals.ACC_IN=1; mControlStore.add[3].controlSignals.TMP_OUT=1;
+    mControlStore.add[3].nextAddr.csar=0;
+    //store
+    mControlStore.store[0].controlSignals=CSIR_default;
+    mControlStore.store[0].controlSignals.MAR_IN=1; mControlStore.store[0].controlSignals.IR_OUT=1;
+    mControlStore.store[0].nextAddr.csar=13;
+    mControlStore.store[1].controlSignals=CSIR_default;
+    mControlStore.store[1].controlSignals.MDR_IN=1; mControlStore.store[0].controlSignals.ACC_OUT=1;
+    mControlStore.store[1].nextAddr.csar=14;
+    mControlStore.store[2].controlSignals.WRITE=1;
+    //branch
+    mControlStore.brz[0].controlSignals=CSIR_default;
+    mControlStore.brz[0].orAddr.or_addr=1;
+    //sub
+    mControlStore.sub[0].controlSignals=CSIR_default;
+    mControlStore.sub[0].controlSignals.MAR_IN=1; mControlStore.sub[0].controlSignals.IR_OUT=1;
+    mControlStore.sub[0].nextAddr.csar=17;
+    mControlStore.sub[1].controlSignals=CSIR_default;
+    mControlStore.sub[1].controlSignals.READ=1; 
+    mControlStore.sub[1].nextAddr.csar=18;
+    mControlStore.sub[2].controlSignals=CSIR_default;
+    mControlStore.sub[2].controlSignals.ACC_OUT=1; mControlStore.sub[2].controlSignals.ALU_SUB=1;
+    mControlStore.sub[2].nextAddr.csar=19;
+    mControlStore.sub[3].controlSignals=CSIR_default;
+    mControlStore.sub[3].controlSignals.ACC_IN=1; mControlStore.sub[3].controlSignals.TMP_OUT=1;
+    mControlStore.sub[3].nextAddr.csar=0;
+    //jsub
+    mControlStore.jsub[0].controlSignals=CSIR_default;
+    mControlStore.jsub[0].controlSignals.MAR_IN=1; mControlStore.jsub[0].controlSignals.IR_OUT=1;
+    mControlStore.jsub[0].nextAddr.csar=21;
+    mControlStore.jsub[1].controlSignals=CSIR_default;
+    mControlStore.jsub[1].controlSignals.PC_INCR=1; 
+    mControlStore.jsub[1].nextAddr.csar=22;
+    mControlStore.jsub[2].controlSignals=CSIR_default;
+    mControlStore.jsub[2].controlSignals.MDR_IN=1; mControlStore.jsub[2].controlSignals.PC_OUT=1;
+    mControlStore.jsub[2].nextAddr.csar=23;
+    mControlStore.jsub[3].controlSignals=CSIR_default;
+    mControlStore.jsub[3].controlSignals.WRITE=1;
+    mControlStore.jsub[3].nextAddr.csar=0;
+    //jmpi
+    mControlStore.jmpi[0].controlSignals=CSIR_default;
+    mControlStore.jmpi[0].controlSignals.MAR_IN=1; mControlStore.jmpi[0].controlSignals.IR_OUT=1;
+    mControlStore.jmpi[0].nextAddr.csar=25;
+    mControlStore.jmpi[1].controlSignals=CSIR_default;
+    mControlStore.jmpi[1].controlSignals.READ=1; 
+    mControlStore.jmpi[1].nextAddr.csar=26;
+    mControlStore.jmpi[2].controlSignals=CSIR_default;
+    mControlStore.jmpi[2].controlSignals.MDR_OUT=1; mControlStore.jmpi[2].controlSignals.PC_IN=1;
+    mControlStore.jmpi[2].nextAddr.csar=27;
+    mControlStore.jmpi[3].controlSignals=CSIR_default;
+    mControlStore.jmpi[3].controlSignals.WRITE=1;
+    mControlStore.jmpi[3].nextAddr.csar=0;
+    return mControlStore;
 }
 
-*/
+void printRegisters(struct Registers temp){
+	printf("%x\t", temp.PC); 
+  	printf("%x\t", temp.IR); 
+	printf("%x\t", temp.MAR); 
+	printf("%x\t", temp.MDR); 
+	printf("%x\t", temp.ACC); 
+	printf("%x\t", temp.TMP); 
+	
+}
+
+void printCSIR(struct ControlStoreEntry temp){
+	printf("%d", temp.controlSignals.ACC_IN); //bit  0 == ACC_in
+  	printf("%d", temp.controlSignals.ACC_OUT); //bit  1 == ACC_out
+	printf("%d", temp.controlSignals.ALU_ADD); //bit  2 == alu_add
+	printf("%d", temp.controlSignals.ALU_SUB); //bit  3 == alu_sub
+	printf("%d", temp.controlSignals.IR_IN); //bit  4 == IR_in
+	printf("%d", temp.controlSignals.IR_OUT); //bit  5 == IR_out
+	printf("%d", temp.controlSignals.MAR_IN); //bit  6 == MAR_in
+	printf("%d", temp.controlSignals.MDR_IN); //bit  7 == MDR_in
+	printf("%d", temp.controlSignals.MDR_OUT); //bit  8 == MDR_out
+	printf("%d", temp.controlSignals.PC_IN); //bit  9 == PC_in
+	printf("%d", temp.controlSignals.PC_OUT); //bit 10 == PC_out
+	printf("%d", temp.controlSignals.PC_INCR); //bit 11 == pc_incr
+	printf("%d", temp.controlSignals.READ); //bit 12 == read
+	printf("%d", temp.controlSignals.TMP_OUT); //bit 13 == TMP_out
+	printf("%d", temp.controlSignals.WRITE); //bit 14 == write
+	printf("%d", temp.controlSignals.BRTABLE); //bit 15 == br_table
+	printf("|%x|", temp.nextAddr.csar); //next address in hex form
+	printf("%d\t", temp.orAddr.or_addr); //or addr
+	if(temp.controlSignals.ACC_IN==1)
+		printf("ACC_in ");
+	if(temp.controlSignals.ACC_OUT==1)
+		printf("ACC_out ");
+	if(temp.controlSignals.ALU_ADD==1) 
+		printf("alu_add ");
+	if(temp.controlSignals.ALU_SUB==1)
+		printf("alu_sub ");
+	if(temp.controlSignals.IR_IN==1)
+		printf("IR_in ");
+	if(temp.controlSignals.IR_OUT==1) 
+		printf("IR_out ");
+	if(temp.controlSignals.MAR_IN==1) 
+		printf("MAR_in ");
+	if(temp.controlSignals.MDR_IN==1) 
+		printf("MDR_in ");
+	if(temp.controlSignals.MDR_OUT==1) 
+		printf("MDR_out ");
+	if(temp.controlSignals.PC_IN==1) 
+		printf("PC_in ");
+	if(temp.controlSignals.PC_OUT==1) 
+		printf("PC_out ");
+	if(temp.controlSignals.PC_INCR==1) 
+		printf("pc_incr ");
+	if(temp.controlSignals.READ==1) 
+		printf("read ");
+	if(temp.controlSignals.TMP_OUT==1) 
+		printf("TMP_out ");
+	if(temp.controlSignals.WRITE==1)
+		printf("write ");
+	if(temp.controlSignals.BRTABLE==1) 
+		printf("br_table ");
+	printf("\n");
+}
+
+struct ControlStoreEntry indexCS(struct ControlStore temp, int csar){
+	switch(csar) {
+		case 0:
+			return temp.instructionFetch[0];
+		case 1:
+			return temp.instructionFetch[1];
+		case 2:
+			return temp.instructionFetch[2];
+		case 3:
+			return temp.instructionFetch[3];
+		case 4:
+			return temp.instructionFetch[4];
+		case 5:
+			return temp.load[0];
+		case 6:
+			return temp.load[1];
+		case 7:
+			return temp.load[2];
+		case 8:
+			return temp.add[0];
+		case 9:
+			return temp.add[1];
+		case 10:
+			return temp.add[2];
+		case 11:
+			return temp.add[3];
+		case 12:
+			return temp.store[0];
+		case 13:
+			return temp.store[1];
+		case 14:
+			return temp.store[2];
+		case 15:
+			return temp.brz[0];
+		case 16:
+			return temp.sub[0];
+		case 17:
+			return temp.sub[1];
+		case 18:
+			return temp.sub[2];
+		case 19:
+			return temp.sub[3];
+		case 20:
+			return temp.jsub[0];
+		case 21:
+			return temp.jsub[1];
+		case 22:
+			return temp.jsub[2];
+		case 23:
+			return temp.jsub[3];
+		case 24:
+			return temp.jmpi[0];
+		case 25:
+			return temp.jmpi[1];
+		case 26:
+			return temp.jmpi[2];
+		case 27:
+			return temp.jmpi[3];
+
+	}
+	return temp.halt[0];
+}
+
