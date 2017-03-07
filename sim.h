@@ -64,7 +64,7 @@ struct Registers {
 
 struct MemoryWord {
 	unsigned int opcode:3; //3 bits for opcode, 9 bits for address field
-	unsigned int addr:9;
+	signed int addr:9;
 };
 
 struct MainMemory {
@@ -75,4 +75,5 @@ struct ControlStore fillControlStore();
 void printRegisters(struct Registers temp);
 void printCSIR(struct ControlStoreEntry temp);
 struct ControlStoreEntry indexCS(struct ControlStore temp, int csar);
+int decodeTable(int opcode);
 #endif

@@ -34,6 +34,9 @@ int main()
         mem.mainMem[counter].addr=addr;
 		counter++;                          //incr pc
     }
+    //set halt point
+    mem.mainMem[counter].opcode=7;
+
 
     int i;
 	printf("Op code and address");
@@ -52,9 +55,9 @@ int main()
      
     //begin processing the instructions in mainmem
     int cycle=1;
-    for(i=0; i< counter; i++){
+    printf("cycle\tPC\tIR\tMAR\tMDR\tACC\tTMP\tCSAR\t\tCISR\t\tcntl signals\n");
+    while(mCSAR.csar < 28) {
     	currentCS=indexCS(mControlStore, mCSAR.csar);
-    	mCSAR=currentCS.nextAddr;
     	printf("%d:\t", cycle); printRegisters(mRegisters); printf("%x\t", mCSAR.csar); printCSIR(currentCS);
 
     	if(currentCS.controlSignals.ACC_IN==1){
@@ -73,14 +76,16 @@ int main()
     			mRegisters.IR=mRegisters.MDR;
     		}
 		}
-		if(currentCS.controlSignals.PC_INCR==1) {
-			mRegisters.PC++;
-		}
 		if(currentCS.controlSignals.READ==1){
-			mRegisters.MDR=mem.mainMem[i].addr;
+			mRegisters.MDR=((mem.mainMem[mRegisters.MAR].opcode << 9) | mem.mainMem[mRegisters.MAR].addr);
+			opcode= mem.mainMem[mRegisters.MAR].opcode;
 		}
 		if(currentCS.controlSignals.WRITE==1){
-			mem.mainMem[i].addr=mRegisters.MDR;
+			mem.mainMem[mRegisters.MAR].opcode=mRegisters.MDR >> 9;
+			mem.mainMem[mRegisters.MAR].addr=mRegisters.MDR & 0x1FF;
+		}
+		if(currentCS.controlSignals.PC_INCR==1) {
+			mRegisters.PC++;
 		}
 		if(currentCS.controlSignals.MDR_IN==1) {
 			if(currentCS.controlSignals.ACC_OUT==1){
@@ -92,7 +97,7 @@ int main()
 		}
 		if(currentCS.controlSignals.MAR_IN==1) {
 			if(currentCS.controlSignals.IR_OUT==1){
-    			mRegisters.MAR=mRegisters.IR;
+    			mRegisters.MAR=mRegisters.IR & 0x1FF;
     		}
     		if(currentCS.controlSignals.PC_OUT==1){
     			mRegisters.MAR=mRegisters.PC;
@@ -107,33 +112,33 @@ int main()
     			mRegisters.PC=mRegisters.MDR;
     		}
 		}
+		if(currentCS.controlSignals.BRTABLE==1) {
+			mCSAR.csar=decodeTable(mem.mainMem[mRegisters.MAR].opcode);
+		} else {
+			mCSAR=currentCS.nextAddr;
+		}
+		if(currentCS.controlSignals.ALU_ADD==1) {
+			mRegisters.TMP=mRegisters.ACC+mRegisters.MDR;
+		}
+		if(currentCS.controlSignals.ALU_SUB==1) {
+			mRegisters.TMP=mRegisters.ACC-mRegisters.MDR;
+		}
+		if(currentCS.orAddr.or_addr==1){
+			if(mRegisters.ACC==0){
+				mCSAR.csar=1;
+			}
+		}
+		cycle++;
 
     }
-    /*
-    while(CSIR != -1)
-    {
-        printf("Enter 22 bit CSIR(-1 to end):  ");
-        scanf("%x", &CSIR);
-        if(CSIR[ACC_IN]) ACC = BUS;
-        if(CSIR[ACC_OUT]) BUS = ACC;
-        //if(CSIR[ALU_ADD]) aluadd;
-        //if(CSIR[ALU_SUB]) alusub;
-        if(CSIR[IR_IN]) IR = BUS;
-        if(CSIR[IR_OUT]) BUS = IR; //supposed to be address portion of IR, not full value
-        if(CSIR[MAR_IN]) MAR = BUS;
-        if(CSIR[MDR_IN]) MDR = BUS;
-        if(CSIR[MDR_OUT]) BUS = MDR;
-        if(CSIR[PC_IN]) PC = BUS;
-        if(CSIR[PC_OUT]) BUS = PC;
-        if(CSIR[PC_INCR]) PC++;
-        //if(CSIR[READ]) MDR = mem[MAR];
-        if(CSIR[TMP_OUT]) BUS = TMP;
-        //if(CSIR[WRITE]) mem[MAR] = MDR;
-        //if(CSIR[BRTABLE]) brtable use decoder;
-        //if(CSIR[NEXT]) next inst;
-        //if(CSIR[OR_ADDR]) override;
-    }    
-    */
+    printf("\nlow memory\n");
+    for(i=0; i< counter; i++){
+    	printf("%x\t", ((mem.mainMem[i].opcode << 9) | mem.mainMem[i].addr));
+    	if(i==9)
+    		printf("\n");
+    }
+    printf("\n");
+    
     return 0;
 }
 
@@ -183,7 +188,7 @@ struct ControlStore fillControlStore(){
     mControlStore.store[0].controlSignals.MAR_IN=1; mControlStore.store[0].controlSignals.IR_OUT=1;
     mControlStore.store[0].nextAddr.csar=13;
     mControlStore.store[1].controlSignals=CSIR_default;
-    mControlStore.store[1].controlSignals.MDR_IN=1; mControlStore.store[0].controlSignals.ACC_OUT=1;
+    mControlStore.store[1].controlSignals.MDR_IN=1; mControlStore.store[1].controlSignals.ACC_OUT=1;
     mControlStore.store[1].nextAddr.csar=14;
     mControlStore.store[2].controlSignals.WRITE=1;
     //branch
@@ -258,7 +263,7 @@ void printCSIR(struct ControlStoreEntry temp){
 	printf("%d", temp.controlSignals.TMP_OUT); //bit 13 == TMP_out
 	printf("%d", temp.controlSignals.WRITE); //bit 14 == write
 	printf("%d", temp.controlSignals.BRTABLE); //bit 15 == br_table
-	printf("|%x|", temp.nextAddr.csar); //next address in hex form
+	printf("|%02x|", temp.nextAddr.csar); //next address in hex form
 	printf("%d\t", temp.orAddr.or_addr); //or addr
 	if(temp.controlSignals.ACC_IN==1)
 		printf("ACC_in ");
@@ -292,6 +297,8 @@ void printCSIR(struct ControlStoreEntry temp){
 		printf("write ");
 	if(temp.controlSignals.BRTABLE==1) 
 		printf("br_table ");
+	if(temp.orAddr.or_addr==1)
+		printf("or_addr");
 	printf("\n");
 }
 
@@ -358,3 +365,24 @@ struct ControlStoreEntry indexCS(struct ControlStore temp, int csar){
 	return temp.halt[0];
 }
 
+int decodeTable(int opcode){
+	switch(opcode){
+		case 0: //load
+			return 5;
+		case 1: //add
+			return 8;
+		case 2: //store
+			return 12;
+		case 3: //brz
+			return 15;
+		case 4: //sub
+			return 16;
+		case 5: //jsub
+			return 20;
+		case 6: //jmpi
+			return 25;
+		case 7: //halt
+			return -1;
+	}
+	return -1;
+}
