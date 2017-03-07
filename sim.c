@@ -17,32 +17,30 @@ int main()
     struct ControlStoreEntry currentCS; //CSIR, CSAR, and Or_addr
     struct ControlStore mControlStore; //Control Store 32 x 22-bit 
     struct CSAR mCSAR;          
-    //data bus?
-    //unsigned int BUS = 0;
     //initialize Control Store values
     mControlStore= fillControlStore();
 
+    //scan the input into the main memory
     unsigned int word, opcode, addr;
     int counter=0;
-    //scan the input into the main memory
     while(scanf("%x", &word) != EOF && word != -1){   
-        opcode = word >> 9;            //calc opcode
+        opcode = word >> 9;  //calc opcode
         mem.mainMem[counter].opcode= opcode; 
         unsigned int mask = 0x1FF;     
         
-        addr = word & mask;            //calc addr
+        addr = word & mask;  //calc addr
         mem.mainMem[counter].addr=addr;
-		counter++;                          //incr pc
+		counter++;  //incr memory index
     }
     //set halt point
     mem.mainMem[counter].opcode=7;
 
-
-    int i;
-	printf("Op code and address");
-    for(i=0; i< counter; i++){
-    	printf("\n%d: %d -> %d", i, mem.mainMem[i].opcode, mem.mainMem[i].addr);
-    }
+//    Test printing the contents of memory as opcode -> address
+//    int i;
+//    printf("Op code and address");
+//    for(i=0; i< counter; i++){
+//   	printf("\n%d: %d -> %d", i, mem.mainMem[i].opcode, mem.mainMem[i].addr);
+//    }
    	
    	//print the contents of main memory
 	printf("\nlow memory\n");
@@ -56,13 +54,16 @@ int main()
     //begin processing the instructions in mainmem
     int cycle=1;
     printf("cycle PC  IR MAR MDR ACC TMP  CSAR      CISR\t\t      cntl signals\n");
+    //while the address is within the control store. AKA not halt
     while(mCSAR.csar < 29) {
     	currentCS=indexCS(mControlStore, mCSAR.csar);
     	if(mCSAR.csar==0){
     		printf("    +---+---+---+---+---+---+/----//---------------------//---------------/\n");
     	}
+    	//print the current line for the cycle
     	printf("%2d: ", cycle); printRegisters(mRegisters); printf("%2x   ", mCSAR.csar); printCSIR(currentCS);
-
+    	//microinstruction operations
+    	//store in the ACC
     	if(currentCS.controlSignals.ACC_IN==1){
     		if(currentCS.controlSignals.TMP_OUT==1){
     			mRegisters.ACC=mRegisters.TMP;
@@ -71,6 +72,7 @@ int main()
     			mRegisters.ACC=mRegisters.MDR;
     		}
     	}
+    	//store in the IR
 		if(currentCS.controlSignals.IR_IN==1){
 			if(currentCS.controlSignals.TMP_OUT==1){
     			mRegisters.IR=mRegisters.TMP;
@@ -79,17 +81,21 @@ int main()
     			mRegisters.IR=mRegisters.MDR;
     		}
 		}
+		//read data from main memory and store it in MDR
 		if(currentCS.controlSignals.READ==1){
 			mRegisters.MDR=((mem.mainMem[mRegisters.MAR].opcode << 9) | mem.mainMem[mRegisters.MAR].addr);
 			opcode= mem.mainMem[mRegisters.MAR].opcode;
 		}
+		//write data to main memory from MDR
 		if(currentCS.controlSignals.WRITE==1){
 			mem.mainMem[mRegisters.MAR].opcode=mRegisters.MDR >> 9;
 			mem.mainMem[mRegisters.MAR].addr=mRegisters.MDR & 0x1FF;
 		}
+		//increment PC
 		if(currentCS.controlSignals.PC_INCR==1) {
 			mRegisters.PC++;
 		}
+		//store in the MDR
 		if(currentCS.controlSignals.MDR_IN==1) {
 			if(currentCS.controlSignals.ACC_OUT==1){
     			mRegisters.MDR=mRegisters.ACC;
@@ -98,6 +104,7 @@ int main()
     			mRegisters.MDR=mRegisters.PC;
     		}
 		}
+		//store in the MAR
 		if(currentCS.controlSignals.MAR_IN==1) {
 			if(currentCS.controlSignals.IR_OUT==1){
     			mRegisters.MAR=mRegisters.IR & 0x1FF;
@@ -105,8 +112,8 @@ int main()
     		if(currentCS.controlSignals.PC_OUT==1){
     			mRegisters.MAR=mRegisters.PC;
     		}
-
 		}
+		//store in the PC
 		if(currentCS.controlSignals.PC_IN==1) {
 			if(currentCS.controlSignals.IR_OUT==1){
     			mRegisters.PC=mRegisters.IR;
@@ -115,17 +122,21 @@ int main()
     			mRegisters.PC=mRegisters.MDR;
     		}
 		}
+		//set the next CSAR
 		if(currentCS.controlSignals.BRTABLE==1) {
 			mCSAR.csar=decodeTable(mem.mainMem[mRegisters.MAR].opcode);
 		} else {
 			mCSAR=currentCS.nextAddr;
 		}
+		//add values from ACC and MDR
 		if(currentCS.controlSignals.ALU_ADD==1) {
 			mRegisters.TMP=mRegisters.ACC+mRegisters.MDR;
 		}
+		//sub values from ACC and MDR
 		if(currentCS.controlSignals.ALU_SUB==1) {
 			mRegisters.TMP=mRegisters.ACC-mRegisters.MDR;
 		}
+		//determine if override flag is used
 		if(currentCS.orAddr.or_addr==1){
 			if(mRegisters.ACC==0){
 				mCSAR.csar=1;
@@ -144,7 +155,7 @@ int main()
     
     return 0;
 }
-
+//fills the control store with values for the microcode set
 struct ControlStore fillControlStore(){
 	struct ControlStore mControlStore;
 	//ifetch 
@@ -241,7 +252,7 @@ struct ControlStore fillControlStore(){
     mControlStore.jmpi[3].nextAddr.csar=0;
     return mControlStore;
 }
-
+//prints the registers in the correct format
 void printRegisters(struct Registers temp){
 	printf("%3x  ", temp.PC); 
   	printf("%3x ", temp.IR); 
@@ -252,6 +263,7 @@ void printRegisters(struct Registers temp){
 	
 }
 
+//prints the CSIR in the correct format
 void printCSIR(struct ControlStoreEntry temp){
 	printf("%d", temp.controlSignals.ACC_IN); //bit  0 == ACC_in
   	printf("%d", temp.controlSignals.ACC_OUT); //bit  1 == ACC_out
@@ -307,7 +319,7 @@ void printCSIR(struct ControlStoreEntry temp){
 		printf("or_addr");
 	printf("\n");
 }
-
+//determines which control store entry matches the csar
 struct ControlStoreEntry indexCS(struct ControlStore temp, int csar){
 	switch(csar) {
 		case 0:
@@ -373,6 +385,7 @@ struct ControlStoreEntry indexCS(struct ControlStore temp, int csar){
 	return temp.halt[0];
 }
 
+//decodes opcodes to the first csar of a microcode
 int decodeTable(int opcode){
 	switch(opcode){
 		case 0: //load
