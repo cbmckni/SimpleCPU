@@ -58,6 +58,9 @@ int main()
     printf("cycle\tPC\tIR\tMAR\tMDR\tACC\tTMP\tCSAR\t\tCISR\t\tcntl signals\n");
     while(mCSAR.csar < 28) {
     	currentCS=indexCS(mControlStore, mCSAR.csar);
+    	if(mCSAR.csar==0){
+    		printf("\t+---+---+---+---+---+---+/----//---------------------//---------------/\n");
+    	}
     	printf("%d:\t", cycle); printRegisters(mRegisters); printf("%x\t", mCSAR.csar); printCSIR(currentCS);
 
     	if(currentCS.controlSignals.ACC_IN==1){
