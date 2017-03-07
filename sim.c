@@ -44,6 +44,7 @@ int main()
    	
    	//print the contents of main memory
 	printf("\nlow memory\n");
+	int i;
     for(i=0; i< counter; i++){
     	printf("%x\t", ((mem.mainMem[i].opcode << 9) | mem.mainMem[i].addr));
     	if(i==9)
