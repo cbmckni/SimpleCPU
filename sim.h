@@ -48,7 +48,7 @@ struct ControlStore{
   struct ControlStoreEntry store[3]; //3 time cycles for store instructions
   struct ControlStoreEntry brz[1]; //1 time cycle for branch zero
   struct ControlStoreEntry sub[4]; //4 time cycles for sub instruction
-  struct ControlStoreEntry jsub[4]; //4 time cycles for jsub instruction
+  struct ControlStoreEntry jsub[5]; //4 time cycles for jsub instruction
   struct ControlStoreEntry jmpi[4]; //4 time cycles for jmpi instruction
   struct ControlStoreEntry halt[1]; //1 time cycle for halt
 };

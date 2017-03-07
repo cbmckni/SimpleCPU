@@ -55,13 +55,13 @@ int main()
      
     //begin processing the instructions in mainmem
     int cycle=1;
-    printf("cycle\tPC\tIR\tMAR\tMDR\tACC\tTMP\tCSAR\t\tCISR\t\tcntl signals\n");
-    while(mCSAR.csar < 28) {
+    printf("cycle PC  IR MAR MDR ACC TMP  CSAR      CISR\t\t      cntl signals\n");
+    while(mCSAR.csar < 29) {
     	currentCS=indexCS(mControlStore, mCSAR.csar);
     	if(mCSAR.csar==0){
-    		printf("\t+---+---+---+---+---+---+/----//---------------------//---------------/\n");
+    		printf("    +---+---+---+---+---+---+/----//---------------------//---------------/\n");
     	}
-    	printf("%d:\t", cycle); printRegisters(mRegisters); printf("%x\t", mCSAR.csar); printCSIR(currentCS);
+    	printf("%2d: ", cycle); printRegisters(mRegisters); printf("%2x   ", mCSAR.csar); printCSIR(currentCS);
 
     	if(currentCS.controlSignals.ACC_IN==1){
     		if(currentCS.controlSignals.TMP_OUT==1){
@@ -215,24 +215,27 @@ struct ControlStore fillControlStore(){
     mControlStore.jsub[0].controlSignals.MAR_IN=1; mControlStore.jsub[0].controlSignals.IR_OUT=1;
     mControlStore.jsub[0].nextAddr.csar=21;
     mControlStore.jsub[1].controlSignals=CSIR_default;
-    mControlStore.jsub[1].controlSignals.PC_INCR=1; 
+    mControlStore.jsub[1].controlSignals.MDR_IN=1; mControlStore.jsub[1].controlSignals.PC_OUT=1;
     mControlStore.jsub[1].nextAddr.csar=22;
     mControlStore.jsub[2].controlSignals=CSIR_default;
-    mControlStore.jsub[2].controlSignals.MDR_IN=1; mControlStore.jsub[2].controlSignals.PC_OUT=1;
+    mControlStore.jsub[2].controlSignals.WRITE=1;
     mControlStore.jsub[2].nextAddr.csar=23;
     mControlStore.jsub[3].controlSignals=CSIR_default;
-    mControlStore.jsub[3].controlSignals.WRITE=1;
-    mControlStore.jsub[3].nextAddr.csar=0;
+    mControlStore.jsub[3].controlSignals.PC_IN=1; mControlStore.jsub[3].controlSignals.IR_OUT=1;
+    mControlStore.jsub[3].nextAddr.csar=24;
+    mControlStore.jsub[4].controlSignals=CSIR_default;
+    mControlStore.jsub[4].controlSignals.PC_INCR=1;
+    mControlStore.jsub[4].nextAddr.csar=0;
     //jmpi
     mControlStore.jmpi[0].controlSignals=CSIR_default;
     mControlStore.jmpi[0].controlSignals.MAR_IN=1; mControlStore.jmpi[0].controlSignals.IR_OUT=1;
-    mControlStore.jmpi[0].nextAddr.csar=25;
+    mControlStore.jmpi[0].nextAddr.csar=26;
     mControlStore.jmpi[1].controlSignals=CSIR_default;
     mControlStore.jmpi[1].controlSignals.READ=1; 
-    mControlStore.jmpi[1].nextAddr.csar=26;
+    mControlStore.jmpi[1].nextAddr.csar=27;
     mControlStore.jmpi[2].controlSignals=CSIR_default;
     mControlStore.jmpi[2].controlSignals.MDR_OUT=1; mControlStore.jmpi[2].controlSignals.PC_IN=1;
-    mControlStore.jmpi[2].nextAddr.csar=27;
+    mControlStore.jmpi[2].nextAddr.csar=28;
     mControlStore.jmpi[3].controlSignals=CSIR_default;
     mControlStore.jmpi[3].controlSignals.WRITE=1;
     mControlStore.jmpi[3].nextAddr.csar=0;
@@ -240,12 +243,12 @@ struct ControlStore fillControlStore(){
 }
 
 void printRegisters(struct Registers temp){
-	printf("%x\t", temp.PC); 
-  	printf("%x\t", temp.IR); 
-	printf("%x\t", temp.MAR); 
-	printf("%x\t", temp.MDR); 
-	printf("%x\t", temp.ACC); 
-	printf("%x\t", temp.TMP); 
+	printf("%3x  ", temp.PC); 
+  	printf("%3x ", temp.IR); 
+	printf("%3x ", temp.MAR); 
+	printf("%3x ", temp.MDR); 
+	printf("%3x ", temp.ACC); 
+	printf("%3x   ", temp.TMP); 
 	
 }
 
@@ -267,7 +270,7 @@ void printCSIR(struct ControlStoreEntry temp){
 	printf("%d", temp.controlSignals.WRITE); //bit 14 == write
 	printf("%d", temp.controlSignals.BRTABLE); //bit 15 == br_table
 	printf("|%02x|", temp.nextAddr.csar); //next address in hex form
-	printf("%d\t", temp.orAddr.or_addr); //or addr
+	printf("%d   ", temp.orAddr.or_addr); //or addr
 	if(temp.controlSignals.ACC_IN==1)
 		printf("ACC_in ");
 	if(temp.controlSignals.ACC_OUT==1)
@@ -356,12 +359,14 @@ struct ControlStoreEntry indexCS(struct ControlStore temp, int csar){
 		case 23:
 			return temp.jsub[3];
 		case 24:
-			return temp.jmpi[0];
+			return temp.jsub[4];
 		case 25:
-			return temp.jmpi[1];
+			return temp.jmpi[0];
 		case 26:
-			return temp.jmpi[2];
+			return temp.jmpi[1];
 		case 27:
+			return temp.jmpi[2];
+		case 28:
 			return temp.jmpi[3];
 
 	}
